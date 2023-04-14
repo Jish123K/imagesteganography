@@ -162,57 +162,81 @@ def main():
 
     merge.add_argument('--image1', required=True, help='Image1 path')
 
-    merge.add_argument
-('--image2', required=True, help='Image2 path')
-extract = subparser.add_parser('extract')
+    merge.add_argument('--image2', required=True, help='Image2 path')
 
-extract.add_argument('--image', required=True, help='Image path')
+    merge.add_argument('--output', required=True, help='Output path')
 
-extract.add_argument('--output', required=True, help='Output path')
+    extract = subparser.add_parser('extract')
 
-args = parser.parse_args()
+    extract.add_argument('--image', required=True, help='Image path')
 
-if args.command == 'merge':
+    extract.add_argument('--output', required=True, help='Output path')
 
-    img1 = cv2.imread(args.image1)
+    args = parser.parse_args()
 
-    img2 = cv2.imread(args.image2)
+    if args.command == 'merge':
 
-    # Convert the images to grayscale
+        # Load images
 
-    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+        image1 = Image.open(args.image1)
 
-    img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+        image2 = Image.open(args.image2)
 
-    # Resize the images to have the same shape
+        # Check if image2 is smaller than image1
 
-    img1_resized = cv2.resize(img1_gray, img2_gray.shape[::-1])
+        if image2.size[0] > image1.size[0] or image2.size[1] > image1.size[1]:
 
-    img2_resized = img2_gray
+            raise ValueError('Image 2 should be smaller than Image 1!')
 
-    # Merge the images
+        # Get user input message
 
-    merged_image = merge_images(img1_resized, img2_resized)
+        message = input("Enter message to hide: ")
 
-    # Save the merged image
+        # Encrypt message
 
-    cv2.imwrite(args.output, merged_image)
+        steg = Steganography(generate_key())
 
-elif args.command == 'extract':
+        encrypted_data = steg.encrypt(message)
 
-    img = cv2.imread(args.image)
+        # Hide encrypted message in image1
 
-    # Convert the image to grayscale
+        steg_image = lsb.hide(image1, encrypted_data)
 
-    img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
 
-    # Extract the hidden image
+        # Merge image2 and steganographic image
 
-    extracted_image = extract_image(img_gray)
+        merged_image = Image.new('RGB', (image1.size[0], image1.size[1] + image2.size[1]))
 
-    # Save the extracted image
+        merged_image.paste(steg_image, (0, 0))
 
-    cv2.imwrite(args.output, extracted_image)
+        merged_image.paste(image2, (0, steg_image.size[1]))
+
+        # Save merged image
+
+        merged_image.save(args.output)
+
+    elif args.command == 'extract':
+
+        # Load image
+
+        image = Image.open(args.image)
+
+        # Extract steganographic data
+
+        steg_data = lsb.reveal(image)
+
+        # Decrypt steganographic data
+
+        steg = Steganography(generate_key())
+
+        decrypted_data = steg.decrypt(steg_data)
+
+        # Write decrypted data to output file
+
+        with open(args.output, 'w') as f:
+
+            f.write(decrypted_data)
 
 
-merge.add_argument('--output', required=True, help='Output path')
+    
